@@ -19,23 +19,23 @@ class UrlHighlighter(sublime_plugin.EventListener):
     highlight_semaphore = threading.Semaphore()
 
     def on_activated(self, view):
-        self.update_url_highlights(view)
+        self.update_url_highlights(view, False)
 
     # Blocking handlers for ST2
     def on_load(self, view):
         if sublime.version() < '3000':
-            self.update_url_highlights(view)
+            self.update_url_highlights(view, False)
 
     def on_modified(self, view):
         if sublime.version() < '3000':
-            self.update_url_highlights(view)
+            self.update_url_highlights(view, False)
 
     # Async listeners for ST3
     def on_load_async(self, view):
-        self.update_url_highlights_async(view)
+        self.update_url_highlights_async(view, False)
 
     def on_modified_async(self, view):
-        self.update_url_highlights_async(view)
+        self.update_url_highlights_async(view, False)
 
     def on_close(self, view):
         for map in [self.urls_for_view, self.scopes_for_view, self.ignored_views]:
@@ -43,8 +43,11 @@ class UrlHighlighter(sublime_plugin.EventListener):
                 del map[view.id()]
 
     """The logic entry point. Find all URLs in view, store and highlight them"""
-    def update_url_highlights(self, view):
+    def update_url_highlights(self, view, force):
         settings = sublime.load_settings(UrlHighlighter.SETTINGS_FILENAME)
+        if not force and not settings.get('auto_find_urls', True):
+            return
+
         should_highlight_urls = settings.get('highlight_urls', True)
         max_url_limit = settings.get('max_url_limit', UrlHighlighter.DEFAULT_MAX_URLS)
         file_folder_regex = settings.get('file_folder_regex', '')
@@ -69,10 +72,10 @@ class UrlHighlighter(sublime_plugin.EventListener):
 
     """Same as update_url_highlights, but avoids race conditions with a
     semaphore."""
-    def update_url_highlights_async(self, view):
+    def update_url_highlights_async(self, view, force):
         UrlHighlighter.highlight_semaphore.acquire()
         try:
-            self.update_url_highlights(view)
+            self.update_url_highlights(view, force)
         finally:
             UrlHighlighter.highlight_semaphore.release()
 
@@ -121,6 +124,9 @@ class UrlHighlighter(sublime_plugin.EventListener):
 
         UrlHighlighter.scopes_for_view[view.id()] = new_scopes
 
+class FindUrlsCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        UrlHighlighter().update_url_highlights_async(self.view, True)
 
 
 def open_url(url, view):
