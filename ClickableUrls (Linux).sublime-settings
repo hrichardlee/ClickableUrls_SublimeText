@@ -1,0 +1,10 @@
+{
+	// It is not possible to reliably detect only the file/folder path. You
+	// can use different regexes to capture just what you want:
+	// - Allow spaces:
+	//     (/[-_A-Za-z0-9\\.]+)+
+	// - Allow spaces, only .txt and .py files:
+	//     (/[-_A-Za-z0-9\\.]+)+\\.(txt|py)
+	// You can also set this to "" to disable detecting file/folder paths
+	"file_folder_regex": "(/[-_A-Za-z0-9\\.]+)+"
+}

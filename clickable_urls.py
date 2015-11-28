@@ -2,6 +2,7 @@ import sublime
 import sublime_plugin
 import webbrowser
 import threading
+import os.path
 
 
 class UrlHighlighter(sublime_plugin.EventListener):
@@ -46,11 +47,13 @@ class UrlHighlighter(sublime_plugin.EventListener):
         settings = sublime.load_settings(UrlHighlighter.SETTINGS_FILENAME)
         should_highlight_urls = settings.get('highlight_urls', True)
         max_url_limit = settings.get('max_url_limit', UrlHighlighter.DEFAULT_MAX_URLS)
+        file_folder_regex = settings.get('file_folder_regex', '')
+        combined_regex = '({})|({})'.format(UrlHighlighter.URL_REGEX, file_folder_regex) if file_folder_regex else UrlHighlighter.URL_REGEX
 
         if view.id() in UrlHighlighter.ignored_views:
             return
 
-        urls = view.find_all(UrlHighlighter.URL_REGEX)
+        urls = view.find_all(combined_regex)
 
         # Avoid slowdowns for views with too much URLs
         if len(urls) > max_url_limit:
@@ -120,12 +123,15 @@ class UrlHighlighter(sublime_plugin.EventListener):
 
 
 
-def open_url(url):
-    browser =  sublime.load_settings(UrlHighlighter.SETTINGS_FILENAME).get('clickable_urls_browser')
-    try:
-        webbrowser.get(browser).open(url, autoraise=True)
-    except(webbrowser.Error):
-        sublime.error_message('Failed to open browser. See "Customizing the browser" in the README.')
+def open_url(url, view):
+    if os.path.isfile(url):
+        view.window().open_file(url)
+    else:
+        browser = sublime.load_settings(UrlHighlighter.SETTINGS_FILENAME).get('clickable_urls_browser')
+        try:
+            webbrowser.get(browser).open(url, autoraise=True)
+        except(webbrowser.Error):
+            sublime.error_message('Failed to open browser. See "Customizing the browser" in the README.')
 
 class OpenUrlUnderCursorCommand(sublime_plugin.TextCommand):
     def run(self, edit):
@@ -136,11 +142,11 @@ class OpenUrlUnderCursorCommand(sublime_plugin.TextCommand):
                 if not selection:
                     return
             url = self.view.substr(selection)
-            open_url(url)
+            open_url(url, self.view)
 
 
 class OpenAllUrlsCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         if self.view.id() in UrlHighlighter.urls_for_view:
             for url in set([self.view.substr(url_region) for url_region in UrlHighlighter.urls_for_view[self.view.id()]]):
-                open_url(url)
+                open_url(url, view)
